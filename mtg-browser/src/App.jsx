@@ -1,7 +1,59 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { Search } from 'lucide-react';
 
 const CARD_IMAGE_ENDPOINT = 'https://cards.scryfall.io/normal/front/';
+
+// LazyImage component with intersection observer
+const LazyImage = memo(({ src, alt, className }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+  const imgRef = useRef();
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      {
+        rootMargin: '50px', // Start loading when image is 50px from viewport
+      }
+    );
+
+    if (imgRef.current) {
+      observer.observe(imgRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  return (
+    <div
+      ref={imgRef}
+      className={`${className} ${!isLoaded ? 'bg-gray-200 animate-pulse' : ''}`}
+    >
+      {isInView && (
+        <img
+          src={src}
+          alt={alt}
+          className={`w-full h-full object-contain transition-opacity duration-300 ${isLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          onLoad={() => setIsLoaded(true)}
+          onError={(e) => {
+            e.target.src = '/card_img/placeholder.jpg';
+            e.target.onerror = null;
+            setIsLoaded(true);
+          }}
+          loading="lazy"
+        />
+      )}
+    </div>
+  );
+});
 
 const MTGCardsGrid = () => {
   const [cards, setCards] = useState([]);
@@ -76,7 +128,7 @@ const MTGCardsGrid = () => {
   return (
     <div className="p-6 min-h-screen bg-gray-100">
       {/* Filter Controls */}
-      <div className="mb-8 bg-white p-4 rounded-lg shadow">
+      <div className="mb-8 bg-white p-4 rounded-lg shadow sticky top-0 z-10">
         <h1 className="text-2xl font-bold mb-4">MTG Cards Browser</h1>
         <div className="flex flex-wrap gap-4">
           <div className="flex-1 min-w-64">
@@ -118,14 +170,10 @@ const MTGCardsGrid = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {filteredCards.map((card) => (
           <div key={card.mtgjson_uuid} className="bg-white rounded-lg shadow overflow-hidden">
-            <img
+            <LazyImage
               src={`${CARD_IMAGE_ENDPOINT}${card.scryfall_id[0]}/${card.scryfall_id[1]}/${card.scryfall_id}.jpg`}
               alt={card.card_name}
-              className="w-full object-contain"
-              onError={(e) => {
-                e.target.src = '/card_img/placeholder.jpg';
-                e.target.onerror = null;
-              }}
+              className="w-full aspect-[7/5]"
             />
             <div className="p-4">
               <h3 className="font-bold text-lg mb-2">{card.card_name}</h3>
